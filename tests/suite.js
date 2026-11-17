@@ -26,6 +26,9 @@ window.U4TestSuite = {
     ok("5 room tiles", qa(".room-tile").length === 5, qa(".room-tile").length);
     ok("continue card", !!q(".continue-card"));
     ok("initial stars 0", q("#star-count").textContent === "0", q("#star-count").textContent);
+    ok("tts status api", typeof U4.tts.status === "function" && !!U4.tts.status());
+    var tst = U4.tts.status();
+    ok("tts api reports voices", typeof tst.voices === "number", "voices=" + tst.voices + " supported=" + tst.supported);
 
     // 2) room explore
     qa(".room-tile")[0].click();
@@ -160,6 +163,13 @@ window.U4TestSuite = {
     }
     qa(".t-tab")[3].click(); await sleep(300);
     ok("data tab skill bars", qa(".progress-row").length > 0, qa(".progress-row").length);
+    qa(".t-tab")[4].click(); await sleep(400);
+    ok("voice diag card", q(".t-panel").textContent.indexOf("语音自检") >= 0);
+    ok("voice test buttons", qa('[data-act="voiceCheck"]').length === 1, qa('[data-act="voiceCheck"]').length);
+    ok("sound banner if no voices", !!q("#sound-banner") || U4.tts.status().voices > 0, q("#sound-banner") ? "shown" : "voices=" + U4.tts.status().voices);
+    var sbx = q("#sound-banner .sb-x");
+    if (sbx) { sbx.click(); await sleep(200); }
+    ok("sound banner closable", !q("#sound-banner"));
 
     // 10) decor
     U4.router.show("decor");

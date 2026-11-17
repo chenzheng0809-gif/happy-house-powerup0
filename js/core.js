@@ -269,13 +269,23 @@
   var PREF_EN = ["Samantha", "Karen", "Moira", "Daniel", "Alex", "Google US English", "Microsoft Aria", "Microsoft Jenny", "Tessa", "Fiona"];
   var PREF_ZH = ["Tingting", "Ting-Ting", "Meijia", "Mei-Jia", "Google 普通话", "Microsoft Xiaoxiao", "Microsoft Huihui", "Sinji", "Li-mu"];
   function loadVoices() {
-    if (!synth) return;
+    if (!synth) { voices = []; return voices; }
     try { voices = synth.getVoices() || []; } catch (e) { voices = []; }
+    return voices;
   }
   if (synth) {
     loadVoices();
-    if (typeof synth.addEventListener === "function") synth.addEventListener("voiceschanged", loadVoices);
-    else synth.onvoiceschanged = loadVoices;
+    try {
+      if (typeof synth.addEventListener === "function") synth.addEventListener("voiceschanged", loadVoices);
+      else synth.onvoiceschanged = loadVoices;
+    } catch (e) { }
+    // Chrome / Safari 的语音列表是异步加载的，多取几次
+    setTimeout(loadVoices, 300);
+    setTimeout(loadVoices, 1200);
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden || !synth) return;
+      try { if (synth.paused) synth.resume(); } catch (e) { }
+    });
   }
   function pickVoice(lang, pref) {
     var l = (lang || "en").slice(0, 2).toLowerCase();
@@ -288,24 +298,97 @@
   var tts = {
     supported: !!synth,
     speaking: false,
-    stop: function () { if (synth) { try { synth.cancel(); } catch (e) { } } tts.speaking = false; },
+    gen: 0,
+    health: { starts: 0, lastStartAt: 0, lastError: "", errors: [] },
+    refresh: function () { loadVoices(); return tts.status(); },
+    status: function () {
+      loadVoices();
+      var en = 0, zh = 0;
+      for (var i = 0; i < voices.length; i++) {
+        var l = (voices[i].lang || "").toLowerCase();
+        if (l.indexOf("en") === 0) en++;
+        if (l.indexOf("zh") === 0) zh++;
+      }
+      var ev = pickVoice("en-US", PREF_EN), zv = pickVoice("zh-CN", PREF_ZH);
+      var paused = false;
+      try { paused = !!(synth && synth.paused); } catch (e) { }
+      return {
+        supported: !!synth, sound: state.sound !== false, voices: voices.length, en: en, zh: zh,
+        enVoice: ev ? ev.name : "", zhVoice: zv ? zv.name : "",
+        starts: tts.health.starts, lastStartAt: tts.health.lastStartAt, lastError: tts.health.lastError,
+        errors: tts.health.errors.slice(), paused: paused
+      };
+    },
+    stop: function () {
+      tts.gen++;
+      tts.speaking = false;
+      if (synth) { try { synth.cancel(); } catch (e) { } }
+    },
     speak: function (text, opts) {
       opts = opts || {};
       if (!text) return false;
-      if (!synth || state.sound === false || !tts.supported) { if (opts.onend) setTimeout(opts.onend, 0); return false; }
-      try { synth.cancel(); } catch (e) { }
-      var u = new SpeechSynthesisUtterance(String(text).replace(/\s+/g, " ").trim());
+      if (!synth || !tts.supported || state.sound === false) { if (opts.onend) setTimeout(opts.onend, 0); return false; }
+      text = String(text).replace(/\s+/g, " ").trim();
+      if (!text) return false;
       var lang = opts.lang || "en-US";
+      var myGen = ++tts.gen;
+      var wasActive = false;
+      try { wasActive = !!(synth.speaking || synth.pending); } catch (e) { wasActive = false; }
+      if (wasActive) { try { synth.cancel(); } catch (e) { } }
+      if (!voices.length) loadVoices();
+      var u = new SpeechSynthesisUtterance(text);
       u.lang = lang;
       var v = pickVoice(lang, lang.indexOf("zh") === 0 ? PREF_ZH : PREF_EN);
       if (v) u.voice = v;
       u.rate = opts.rate || (lang.indexOf("zh") === 0 ? 0.95 : 0.82);
       u.pitch = opts.pitch || (lang.indexOf("zh") === 0 ? 1.05 : 1.12);
       u.volume = 1;
-      if (opts.onend) u.onend = function () { tts.speaking = false; opts.onend(); };
-      u.onerror = function () { tts.speaking = false; if (opts.onend) opts.onend(); };
+      var done = false, attempt = 0, startedAt = Date.now();
       tts.speaking = true;
-      try { synth.speak(u); } catch (e) { tts.speaking = false; if (opts.onend) opts.onend(); return false; }
+      function finish(kind, evObj) {
+        if (done) return;
+        done = true;
+        if (myGen === tts.gen) tts.speaking = false;
+        if (kind === "error") {
+          var errName = (evObj && evObj.error) || "unknown";
+          tts.health.lastError = errName;
+          tts.health.errors.push(errName);
+          if (tts.health.errors.length > 8) tts.health.errors.shift();
+          if (myGen === tts.gen && opts.onerror) { try { opts.onerror(evObj); } catch (e) { } }
+        }
+        if (myGen === tts.gen && opts.onend) { try { opts.onend(); } catch (e) { } }
+      }
+      u.onstart = function () {
+        tts.health.starts++;
+        tts.health.lastStartAt = Date.now();
+        if (opts.onstart) { try { opts.onstart(); } catch (e) { } }
+      };
+      u.onend = function () { finish("end"); };
+      u.onerror = function (ev2) { finish("error", ev2); };
+      function go() {
+        if (myGen !== tts.gen) return;
+        try { if (synth.paused) synth.resume(); } catch (e) { }
+        try { synth.speak(u); } catch (e) {
+          tts.health.lastError = "speak-failed";
+          finish("error", { error: "speak-failed" });
+          return;
+        }
+        // 看门狗：1.4 秒还没开始就重试一次（Chrome 偶尔会卡在取消后的空转状态）
+        setTimeout(function () {
+          if (done || myGen !== tts.gen) return;
+          if (tts.health.lastStartAt > startedAt) return;
+          if (attempt >= 1) return;
+          attempt++;
+          try { synth.cancel(); } catch (e) { }
+          try { if (synth.paused) synth.resume(); } catch (e) { }
+          setTimeout(function () {
+            if (done || myGen !== tts.gen) return;
+            try { synth.speak(u); } catch (e) { }
+          }, 140);
+        }, 1400);
+      }
+      if (wasActive) setTimeout(go, 80);
+      else go();
       return true;
     },
     sayEn: function (text, opts) { opts = opts || {}; opts.lang = "en-US"; return tts.speak(text, opts); },
@@ -321,6 +404,15 @@
         tts.speak(item.text, o);
       }
       next();
+    },
+    /* 启动后自检：没声音 / 没语音包时给出可见提示 */
+    selfCheck: function () {
+      if (state.sound === false) return;
+      if (util.qs("#sound-banner")) return;
+      var st = tts.status();
+      if (!st.supported) { fx.banner("这个浏览器不支持语音朗读，建议用 Chrome 或 Safari 打开", "openSoundCheck"); return; }
+      if (st.voices === 0) { fx.banner("没有检测到语音包，点这里看看怎么打开声音", "openSoundCheck"); return; }
+      if (st.starts === 0) { fx.banner("好像还没有听到声音？点这里检查音量与语音设置", "openSoundCheck"); }
     }
   };
   U4.tts = tts;
@@ -394,6 +486,17 @@
         t.style.opacity = "0"; t.style.transform = "translateY(.5rem)";
         setTimeout(function () { t.remove(); }, 320);
       }, 1500);
+    },
+    /* 底部常驻提示条（用于声音故障自检） */
+    banner: function (msg, act) {
+      var old = util.qs("#sound-banner");
+      if (old) old.remove();
+      var d = util.el("div", "sound-banner");
+      d.id = "sound-banner";
+      d.innerHTML = '<span class="sb-icon">🔇</span><span class="sb-msg">' + msg + "</span>" +
+        '<button class="sb-btn" data-act="' + (act || "openSoundCheck") + '">检查一下</button>' +
+        '<button class="sb-x" data-act="soundBannerClose" title="关闭">×</button>';
+      document.body.appendChild(d);
     }
   };
   U4.fx = fx;
@@ -497,10 +600,19 @@
   function showWordCard(w, opts) {
     opts = opts || {};
     modal.open(wordCardHtml(w), { onClose: opts.onClose, dismissible: true });
-    setTimeout(function () { tts.sayEn(w.en, { rate: 0.7 }); }, 260);
+    // 立即朗读：保留用户手势上下文，iOS / Safari 才会发声
+    tts.sayEn(w.en, { rate: 0.7 });
   }
   U4.showWordCard = showWordCard;
 
+  actions.openSoundCheck = function () {
+    if (U4.teacherGo) U4.teacherGo("settings");
+    else U4.router.show("teacher");
+  };
+  actions.soundBannerClose = function () {
+    var b = util.qs("#sound-banner");
+    if (b) b.remove();
+  };
   actions.wordSay = function (t) {
     var word = decodeURIComponent(t.getAttribute("data-word") || "");
     var rate = parseFloat(t.getAttribute("data-rate") || "0.7");
@@ -514,7 +626,10 @@
     ui.soundIcon();
     var splash = util.qs("#splash");
     var startBtn = util.qs("#btn-splash-start");
+    var started = false;
     function start() {
+      if (started) return;   // 事件冒泡会让 splash/按钮各触发一次，必须只执行一次
+      started = true;
       if (startBtn) startBtn.disabled = true;
       try { audio.init(); audio.unlock(); } catch (e) { }
       try { if (synth && !voices.length) loadVoices(); } catch (e) { }
@@ -523,8 +638,14 @@
       var app = util.qs("#app");
       if (app) app.classList.remove("hidden");
       router.show("map");
-      setTimeout(function () { tts.sayZh("欢迎来到快乐小屋！", { rate: 0.95 }); }, 500);
-      setTimeout(function () { tts.sayEn("Welcome to Happy House!", { rate: 0.8 }); }, 1900);
+      // 欢迎语放在用户手势里同步触发（iOS / Safari 的语音必须由手势引发）
+      try {
+        tts.sayZh("欢迎来到快乐小屋！", {
+          rate: 0.95,
+          onend: function () { tts.sayEn("Welcome to Happy House!", { rate: 0.8 }); }
+        });
+      } catch (e) { }
+      setTimeout(function () { tts.selfCheck(); }, 3200);
     }
     util.on(startBtn, "click", start);
     util.on(splash, "click", start);

@@ -30,6 +30,7 @@
     // 激活音频（任意第一次交互）
     document.addEventListener("pointerdown", function once() {
       try { U4.audio.unlock(); } catch (e) { }
+      try { U4.tts.refresh(); } catch (e) { }
       document.removeEventListener("pointerdown", once);
     });
     // 键盘快捷键：1-4 切换页面（方便老师用投影键盘）

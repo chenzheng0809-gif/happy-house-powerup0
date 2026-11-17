@@ -513,3 +513,20 @@ button{font-family:inherit;color:inherit}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
 }
+
+/* ===== 声音自检提示条 ===== */
+.sound-banner{position:fixed;left:50%;bottom:5.4rem;transform:translateX(-50%);z-index:340;display:flex;align-items:center;gap:.55rem;max-width:min(94vw,44rem);width:max-content;background:#FFF3D6;border:2px solid #F2B84B;border-radius:1rem;padding:.55rem .7rem .55rem .9rem;box-shadow:0 .55rem 1.5rem rgba(160,110,40,.28);font-size:.92rem;color:#8A5A16;animation:sb-in .35s ease both}
+@keyframes sb-in{from{opacity:0;transform:translateX(-50%) translateY(.7rem)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.sound-banner .sb-icon{font-size:1.15rem}
+.sound-banner .sb-msg{line-height:1.35}
+.sound-banner .sb-btn{border:0;border-radius:.7rem;background:#F2B84B;color:#5B3A08;font-weight:700;padding:.42rem .8rem;font-size:.86rem;cursor:pointer;font-family:inherit;white-space:nowrap;min-height:2.2rem}
+.sound-banner .sb-btn:active{transform:scale(.96)}
+.sound-banner .sb-x{border:0;background:transparent;color:#B08948;font-size:1.25rem;line-height:1;cursor:pointer;padding:.1rem .3rem;font-family:inherit}
+
+/* ===== 老师面板：语音自检 ===== */
+.diag-line{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.42rem 0;border-bottom:1px dashed #EADFD2;font-size:.9rem;color:#6B5849}
+.diag-line b{font-weight:700}
+.diag-ok{color:#2E8B57}
+.diag-bad{color:#C04A3B}
+.diag-tip{font-size:.82rem;line-height:1.62;color:#8A7566;background:#FFF9EE;border-radius:.7rem;padding:.55rem .75rem;margin-top:.6rem}
+.row-btns{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.7rem}

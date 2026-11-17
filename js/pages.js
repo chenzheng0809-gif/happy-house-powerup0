@@ -147,6 +147,8 @@
      页面：老师 / 家长
      ===================================================== */
   var teacherTab = "kp";
+  /* 供其他模块跳转到指定标签（如声音自检） */
+  U4.teacherGo = function (id) { teacherTab = id || "kp"; U4.router.show("teacher"); };
   var T_TABS = [
     { id: "kp", label: "📚 知识清单" },
     { id: "map", label: "🗺️ 课程地图" },
@@ -230,12 +232,24 @@
     if (teacherTab === "settings") {
       var soundOn = U4.state.sound !== false;
       var musicOn = U4.state.music !== false;
-      return '<div class="t-card"><h3>⚙️ 声音与语音</h3>' +
+      var vs = U4.tts.status();
+      var okVoice = vs.supported && vs.voices > 0;
+      var diag = '<div class="diag-line"><span>浏览器语音合成</span><b class="' + (vs.supported ? "diag-ok" : "diag-bad") + '">' + (vs.supported ? "✅ 支持" : "❌ 不支持") + "</b></div>" +
+        '<div class="diag-line"><span>可用声音</span><b class="' + (vs.voices ? "diag-ok" : "diag-bad") + '">' + vs.voices + " 个（英语 " + vs.en + " · 中文 " + vs.zh + "）</b></div>" +
+        '<div class="diag-line"><span>首选声音</span><b>' + (vs.enVoice || "—") + " / " + (vs.zhVoice || "—") + "</b></div>" +
+        '<div class="diag-line"><span>最近朗读</span><b class="' + (vs.starts ? "diag-ok" : "diag-bad") + '">' + (vs.starts ? "已成功开始 " + vs.starts + " 次" : (vs.lastError ? "出错：" + vs.lastError : "还没有开始过")) + "</b></div>" +
+        '<div class="row-btns"><button class="btn btn-listen" data-act="testVoiceEn">🔊 测英语</button>' +
+        '<button class="btn btn-ghost" data-act="testVoiceZh">🔊 测中文</button>' +
+        '<button class="btn btn-mint" data-act="voiceCheck">🔄 重新检测</button></div>' +
+        (okVoice ? "" : '<div class="diag-tip"><b>没有检测到语音包：</b>Mac：系统设置 → 辅助功能 → 朗读内容 → 系统声音 → 管理声音，下载「Samantha（英语）」和「婷婷（中文）」；Windows：设置 → 时间和语言 → 语言 → 添加「英语(美国)」并安装语音包；iPad / 安卓：在系统设置里下载英语语音。</div>') +
+        '<div class="diag-tip">如果点「测英语」仍没有声音：① 把电脑 / 平板音量调到 50% 以上；② 在浏览器标签页上右键，取消「静音网站」；③ iPad / iPhone 先点一下页面再播放；④ 换 Chrome 或 Safari 浏览器试试。</div>';
+      return '<div class="t-card"><h3>🔊 语音自检</h3><p>点开页面后应该能听到欢迎语和单词发音。如果听不到，先在这里检查一下：</p>' + diag + "</div>" +
+        '<div class="t-card"><h3>⚙️ 声音与语音</h3>' +
         '<div class="setting-row"><div><div class="sr-label">音效与语音</div><div class="sr-sub">关闭后所有英语发音和游戏音效都会静音</div></div>' +
         '<button class="switch ' + (soundOn ? "on" : "") + '" data-act="toggleSound" aria-label="音效开关"></button></div>' +
         '<div class="setting-row"><div><div class="sr-label">背景音乐</div><div class="sr-sub">轻柔的钢琴小品，可在课堂上关闭</div></div>' +
         '<button class="switch ' + (musicOn ? "on" : "") + '" data-act="toggleMusic" aria-label="音乐开关"></button></div>' +
-        '<div class="setting-row"><div><div class="sr-label">试一试英语发音</div><div class="sr-sub">如果听不到声音，请在系统设置里安装英语语音包</div></div>' +
+        '<div class="setting-row"><div><div class="sr-label">试一试英语发音</div><div class="sr-sub">听到 Hello 说明英语语音正常</div></div>' +
         '<button class="btn btn-listen" data-act="testVoiceEn">🔊 Hello! I\'m Matt.</button></div>' +
         '<div class="setting-row"><div><div class="sr-label">试一试中文语音</div><div class="sr-sub">中文提示音</div></div>' +
         '<button class="btn btn-ghost" data-act="testVoiceZh">🔊 欢迎来到快乐小屋</button></div></div>' +
@@ -250,7 +264,7 @@
     return '<div class="t-card"><h3>ℹ️ 关于这个工具</h3><ul>' +
       T.about.map(function (a) { return "<li>" + a + "</li>"; }).join("") + "</ul></div>" +
       '<div class="t-card"><h3>🧩 内容来源</h3><p>词汇、句型、故事与自然拼读内容整理自老师提供的 PowerUp 0 Unit 4 At home 课件（Lesson 1-8）；故事文本为适合 4-6 岁幼儿课堂使用的简化改编版，保留了教材人物、核心词汇与情感主题。</p>' +
-      '<p>版本：1.0 · 单文件离线网页 · 无需联网 · 数据保存在本机</p></div>';
+      '<p>版本：1.1 · 单文件离线网页 · 无需联网 · 数据保存在本机 · 新增语音自检</p></div>';
   }
 
   /* =====================================================
@@ -364,8 +378,31 @@
     sfx("pop");
     U4.router.refresh();
   };
-  actions.testVoiceEn = function () { tts.sayEn("Hello! I'm Matt. Let's learn English!", { rate: 0.8 }); };
-  actions.testVoiceZh = function () { tts.sayZh("欢迎来到快乐小屋！", { rate: 0.95 }); };
+  function refreshVoicePanel() {
+    setTimeout(function () {
+      if (U4.router.current() === "teacher") U4.router.refresh();
+    }, 1500);
+  }
+  actions.testVoiceEn = function () {
+    txtTest("Hello! I'm Matt. Let's learn English!", "en-US");
+    refreshVoicePanel();
+  };
+  actions.testVoiceZh = function () {
+    txtTest("欢迎来到快乐小屋！", "zh-CN");
+    refreshVoicePanel();
+  };
+  function txtTest(text, lang) {
+    var ok = U4.tts.speak(text, { lang: lang, rate: lang === "zh-CN" ? 0.95 : 0.8 });
+    if (!ok) fx.toast("语音没有打开：请检查上面的「音效与语音」开关");
+  }
+  actions.voiceCheck = function () {
+    var st = U4.tts.refresh();
+    U4.router.refresh();
+    if (!st.supported) fx.toast("这个浏览器不支持语音朗读，请换 Chrome / Safari");
+    else if (st.voices === 0) fx.toast("还是没有检测到语音包，请按下面的方法安装");
+    else if (st.starts > 0) fx.toast("语音正常 ✅ 已经成功朗读 " + st.starts + " 次");
+    else fx.toast("检测到 " + st.voices + " 个声音，请点「测英语」试一下");
+  };
 
   /* 装扮动作 */
   actions.decorAdd = function (t) {
