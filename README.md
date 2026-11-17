@@ -1,5 +1,8 @@
 # 🏡 快乐小屋 Happy House
 
+> 🌐 **在线体验（GitHub Pages）**：<https://chenzheng0809-gif.github.io/happy-house-powerup0/>
+> 📦 **GitHub 仓库**：<https://github.com/chenzheng0809-gif/happy-house-powerup0>
+
 > **PowerUp 0 · Unit 4 «At home» 中班-大班英语启蒙互动课件**
 > 一个完全离线、双击即开的互动教学小工具：把教材里的词汇、句型、故事、自然拼读和形状，变成孩子愿意反复玩的闯关游戏。
 
@@ -7,7 +10,8 @@
 
 ## 🚀 快速开始
 
-1. 打开本文件夹，**双击 `index.html`**（推荐 Chrome / Edge / Safari）。
+**方式一 · 在线玩**：直接打开 <https://chenzheng0809-gif.github.io/happy-house-powerup0/>（手机 / 平板 / 教室电脑都可以）。
+**方式二 · 本地玩**：打开本文件夹，**双击 `index.html`**（推荐 Chrome / Edge / Safari）。
 2. 点一下「点一点，开始探险！」——这一下同时会打开声音。
 3. 上课时建议全屏：Mac `⌃⌘F`，Windows `F11`。
 4. 不需要联网、不需要安装、不需要登录；所有内容都在本地。
