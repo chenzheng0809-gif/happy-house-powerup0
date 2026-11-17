@@ -10,6 +10,7 @@ window.U4TestSuite = {
     await U4TestLib.waitReady(W);
     const D = W.document;
     const U4 = W.U4;
+    try {
     const q = (s) => D.querySelector(s);
     const qa = (s) => Array.from(D.querySelectorAll(s));
     try { W.localStorage.clear(); } catch (e) { }
@@ -58,7 +59,10 @@ window.U4TestSuite = {
     await sleep(800);
     ok("roomfind shell", !!q(".game-shell"));
     ok("roomfind hotspots 5", qa(".game-shell .hotspot").length === 5, qa(".game-shell .hotspot").length);
-    let played = 0, miss = 0;
+    ok("game shell english only", !q(".game-shell .stage-zh") || !q(".game-shell .stage-zh").textContent.trim());
+    ok("game title english", /Level 1/.test(q(".game-shell .game-title").textContent), q(".game-shell .game-title").textContent);
+    ok("listen again english", q('[data-act="gameReplay"]').textContent.indexOf("Listen") >= 0, q('[data-act="gameReplay"]').textContent);
+    let played = 0, miss = 0, nextSeen = 0;
     for (let i = 0; i < 4; i++) {
       const capEl = q(".game-shell .stage-caption");
       const cap = capEl ? capEl.textContent : "";
@@ -66,14 +70,23 @@ window.U4TestSuite = {
       if (!m) break;
       const btn = qa(".game-shell .hotspot").filter(h => h.getAttribute("aria-label") === m[1])[0];
       if (!btn) { miss++; break; }
+      await sleep(300);
+      ok("no chinese in caption " + i, !/[\u4e00-\u9fa5]/.test(cap), cap);
       btn.click();
       played++;
-      await sleep(2100);
+      await sleep(1250);
+      const nb = q('[data-act="gameNext"]');
+      if (!nb || nb.classList.contains("hidden")) { miss++; break; }
+      nextSeen++;
+      nb.click();
+      await sleep(750);
     }
     ok("roomfind 4 rounds played", played === 4, played);
+    ok("manual next per round", nextSeen === 4, nextSeen);
     ok("roomfind target matched", miss === 0);
-    await sleep(600);
+    await sleep(700);
     ok("result after level1", !!q(".result-card"), (q(".result-title") || {}).textContent);
+    ok("level1 result english only", !/[\u4e00-\u9fa5]/.test(q(".result-card").textContent));
     ok("level1 stars", U4.progress.levelStars(1) >= 1, U4.progress.levelStars(1));
     const cont = q('[data-act="resultContinue"]');
     if (cont) cont.click();
@@ -84,22 +97,38 @@ window.U4TestSuite = {
 
     // 5) level 2 quiz play
     async function playQuizRound() {
-      for (let k = 0; k < 10; k++) {
-        const opts = qa(".game-options .opt:not(.ghosted)");
-        if (!opts.length) { await sleep(250); continue; }
-        opts[0].click();
-        await sleep(320);
+      for (let k = 0; k < 24; k++) {
         if (q(".game-options .opt.correct")) return true;
+        const opts = qa(".game-options .opt:not(.ghosted):not(.wrong)");
+        if (!opts.length) { await sleep(300); continue; }
+        opts[0].click();
+        await sleep(500);
       }
-      return false;
+      return !!q(".game-options .opt.correct");
     }
     U4.startLevel(U4.DATA.levels[1]);
     await sleep(700);
     ok("quiz shell", !!q(".game-shell"));
     ok("quiz 5 dots", qa(".game-shell .g-dot").length === 5, qa(".game-shell .g-dot").length);
-    for (let r = 0; r < 5; r++) { await playQuizRound(); await sleep(1700); }
-    await sleep(900);
+    ok("quiz title english", /Level 2/.test(q(".game-shell .game-title").textContent), q(".game-shell .game-title").textContent);
+    let nextCount = 0;
+    for (let r = 0; r < 5; r++) {
+      await playQuizRound();
+      if (r === 0) {
+        const fb = q(".feedback-bar");
+        ok("feedback english only", !!fb && !/[\u4e00-\u9fa5]/.test(fb.textContent), fb ? fb.textContent.trim() : "no feedback");
+      }
+      await sleep(950);
+      const nb = q('[data-act="gameNext"]');
+      if (!nb || nb.classList.contains("hidden")) break;
+      nextCount++;
+      nb.click();
+      await sleep(700);
+    }
+    ok("quiz manual next x5", nextCount === 5, nextCount);
+    await sleep(950);
     ok("quiz result", !!q(".result-card"), (q(".result-title") || {}).textContent);
+    ok("result english only", !/[\u4e00-\u9fa5]/.test(q(".result-card").textContent));
     const cont2 = q('[data-act="resultContinue"]');
     if (cont2) cont2.click();
     await sleep(600);
@@ -185,6 +214,9 @@ window.U4TestSuite = {
     try { ok("localStorage saved", !!W.localStorage.getItem("happy_house_u4_v1")); } catch (e) { out.errors.push("localStorage: " + e); }
     ok("boot error hidden at end", q("#boot-error").classList.contains("hidden"));
     out.navCount = qa(".tab").length;
+    } catch (e) {
+      out.steps.push({ name: "EXCEPTION", pass: false, extra: String((e && e.stack) || e).slice(0, 700) });
+    }
     return out;
   }
 };

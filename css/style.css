@@ -530,3 +530,11 @@ button{font-family:inherit;color:inherit}
 .diag-bad{color:#C04A3B}
 .diag-tip{font-size:.82rem;line-height:1.62;color:#8A7566;background:#FFF9EE;border-radius:.7rem;padding:.55rem .75rem;margin-top:.6rem}
 .row-btns{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.7rem}
+
+/* ===== 游戏：手动切换按钮（答完一题后出现） ===== */
+.game-foot{gap:.85rem;flex-wrap:wrap;align-items:center}
+.btn-next{background:linear-gradient(180deg,#63C7AC,#2F9E77);color:#fff;font-family:var(--font-en);
+  font-weight:900;font-size:1.18rem;letter-spacing:.02em;min-width:10rem;min-height:3.7rem;
+  border-radius:1.2rem;box-shadow:0 .5rem 1.1rem rgba(47,158,119,.35);animation:nextPulse 1.5s ease-in-out infinite}
+@keyframes nextPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+.btn-next:active{transform:scale(.96);animation:none}

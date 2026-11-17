@@ -472,7 +472,7 @@
       var d = util.el("div", "praise-pop");
       d.innerHTML = '<div class="pp-emoji">' + (emoji || util.pick(["🎉", "🌟", "👏", "💯", "🥳", "✨"])) + '</div>' +
         '<div class="pp-en">' + (en || "Great!") + '</div>' +
-        '<div class="pp-zh">' + (zh || "太棒了！") + '</div>';
+        (zh ? '<div class="pp-zh">' + zh + '</div>' : "");
       document.body.appendChild(d);
       setTimeout(function () { d.remove(); }, 1250);
     },

@@ -25,7 +25,36 @@
   const mode = params.get("mode") || "screen";
   if (mode === "room") W2.U4.router.show("room", room);
   else if (mode === "level") W2.U4.startLevel(W2.U4.DATA.levels[(+params.get("id") || 1) - 1]);
-  else if (mode === "story") {
+  else if (mode === "voice") {
+    W2.U4.router.show("teacher");
+    await U4TestLib.sleep(600);
+    var tb = W2.document.querySelector('.t-tab[data-tab="settings"]');
+    if (tb) tb.click();
+    await U4TestLib.sleep(500);
+  } else if (mode === "answer") {
+    var lv = W2.U4.DATA.levels[(+params.get("id") || 1) - 1];
+    W2.U4.startLevel(lv);
+    await U4TestLib.sleep(900);
+    var doc = W2.document;
+    if (lv.type === "room") {
+      var cap = (doc.querySelector(".game-shell .stage-caption") || {}).textContent || "";
+      var mm = /Where is the (.+?)\?/.exec(cap);
+      if (mm) {
+        var hs = Array.prototype.slice.call(doc.querySelectorAll(".game-shell .hotspot"))
+          .filter(function (h) { return h.getAttribute("aria-label") === mm[1]; })[0];
+        if (hs) hs.click();
+      }
+    } else {
+      for (var k = 0; k < 20; k++) {
+        var opts = Array.prototype.slice.call(doc.querySelectorAll(".game-options .opt:not(.ghosted):not(.wrong)"));
+        if (!opts.length) { await U4TestLib.sleep(300); continue; }
+        opts[0].click();
+        await U4TestLib.sleep(450);
+        if (doc.querySelector(".game-options .opt.correct")) break;
+      }
+    }
+    await U4TestLib.sleep(1200);
+  } else if (mode === "story") {
     W2.U4.Stories.open("wishes", null);
     await U4TestLib.sleep(1000);
     const nb = W2.document.querySelector('[data-act="storyNext"]');

@@ -68,16 +68,35 @@
   }
   function gameHead(title, emoji, total) {
     return '<div class="game-head">' +
-      '<button class="icon-btn" data-act="gameClose" title="结束游戏">✕</button>' +
+      '<button class="icon-btn" data-act="gameClose" title="Exit game">✕</button>' +
       '<div class="game-title"><span class="gt-emoji">' + (emoji || "🎮") + '</span>' + title + '</div>' +
       '<div class="g-progress">' + dotsHtml(total) + '</div>' +
       '</div>';
   }
-  function feedback(good, en, zh) {
+  function feedback(good, en) {
+    var old = qs(".feedback-bar");
+    if (old) old.remove();
     var node = el("div", "feedback-bar " + (good ? "good" : "bad"));
-    node.innerHTML = (good ? "🌟" : "🤔") + ' <span><span class="fb-en">' + en + "</span><small>" + zh + "</small></span>";
+    node.innerHTML = (good ? "🌟" : "🤔") + ' <span class="fb-en">' + en + "</span>";
     document.body.appendChild(node);
-    setTimeout(function () { node.remove(); }, 1100);
+    setTimeout(function () { node.remove(); }, 1900);
+  }
+
+  /* 手动切换按钮：答完一题后出现，孩子自己按才进入下一题（给足反应时间） */
+  function nextBtn() {
+    if (!ctx || !ctx.shell) return null;
+    return qs('[data-act="gameNext"]', ctx.shell);
+  }
+  function hideNext() {
+    var b = nextBtn();
+    if (b) b.classList.add("hidden");
+  }
+  function showNext(label) {
+    var b = nextBtn();
+    if (!b) return;
+    b.textContent = label || "Next ▶";
+    b.classList.remove("hidden");
+    sfx("pop");
   }
   function starsFor(correct, total) {
     if (!total) return 0;
@@ -97,23 +116,26 @@
     for (var i = 1; i <= 3; i++) {
       starsHtml += '<span class="star ' + (i <= stars ? "on" : "") + '" style="animation-delay:' + (i * 0.16) + 's">⭐</span>';
     }
-    var title = stars >= 3 ? "太棒了！" : stars >= 1 ? "做得好！" : "再试一次吧！";
-    var subEn = stars >= 3 ? "Perfect! You did it!" : stars >= 1 ? "Well done! Keep going!" : "Never give up! 加油！";
+    var title = stars >= 3 ? "Wonderful!" : stars >= 1 ? "Well done!" : "Try again!";
+    var subEn = stars >= 3 ? "You did it! Perfect!" : stars >= 1 ? "Great job! Keep going!" : "You can do it! Try once more!";
     var html = '<div class="result-card">' +
       '<div class="result-emoji">' + (stars >= 3 ? "🎉" : stars >= 1 ? "🌟" : "💪") + '</div>' +
       '<div class="result-title">' + title + '</div>' +
       '<div class="result-sub">' + subEn + '</div>' +
-      (info.total ? '<div class="result-sub">答对 ' + info.correct + " / " + info.total + " 题</div>" : "") +
+      (info.total ? '<div class="result-sub">Correct: ' + info.correct + " / " + info.total + "</div>" : "") +
       '<div class="stars-row">' + starsHtml + '</div>' +
-      '<div class="result-stats">' + (stars >= 2 ? "⭐ 获得 " + stars + " 颗星星！" : "再玩一次，争取三颗星！") + '</div>' +
+      '<div class="result-stats">' + (stars >= 2 ? "You got " + stars + " stars! ⭐" : "Play again and get 3 stars!") + '</div>' +
       '<div class="wc-actions">' +
-      '<button class="btn btn-mint" data-act="resultRetry">🔁 再玩一次</button>' +
-      '<button class="btn btn-primary" data-act="resultContinue">继续 →</button>' +
+      '<button class="btn btn-mint" data-act="resultRetry">🔁 Play again</button>' +
+      '<button class="btn btn-primary" data-act="resultContinue">Continue →</button>' +
       '</div></div>';
     modal.open(html, { cls: "result-card", closable: false });
     resultCtx = info;
     if (stars >= 2) setTimeout(function () { sfx("cheer"); fx.confetti(90); }, 260);
     else sfx("star");
+    setTimeout(function () {
+      tts.sayEn(stars >= 2 ? "You did it! Great job!" : "Good try! Let's play again!", { rate: 0.8 });
+    }, 650);
   }
 
   function closeResult() { if (modal.isOpen()) modal.close(true); }
@@ -159,25 +181,23 @@
     if (!ctx) return;
     var r = ctx.meta.rounds[ctx.idx];
     if (!r) { finishQuiz(); return; }
+    var idxAt = ctx.idx;
     ctx.locked = false; ctx.firstTry = true; ctx.attempts = 0;
+    hideNext();
     U4.setHTML(ctx.els.visual, r.stageHtml || "");
     U4.setHTML(ctx.els.caption, r.captionEn || r.questionEn || "");
-    U4.setHTML(ctx.els.zh, r.questionZh || "");
     var cls = r.options.length <= 2 ? " big" : "";
     U4.setHTML(ctx.els.options, r.options.map(function (o, i) {
       return '<button class="opt' + cls + '" data-act="gameOpt" data-i="' + i + '">' + o.html + "</button>";
     }).join(""));
     updateDots(ctx.idx);
+    /* 全英文朗读：题目只读英语 */
     ctx.replay = function () {
+      if (ctx.idx !== idxAt) return;
       if (r.speakList) tts.seq(r.speakList);
-      else {
-        tts.seq([
-          { text: r.questionZh, lang: "zh-CN" },
-          { text: r.speakEn || r.questionEn, lang: "en-US" }
-        ]);
-      }
+      else tts.sayEn(r.speakEn || r.questionEn, { rate: 0.78 });
     };
-    setTimeout(function () { if (ctx && ctx.replay) ctx.replay(); }, 280);
+    setTimeout(function () { if (ctx && ctx.idx === idxAt && ctx.replay) ctx.replay(); }, 420);
   }
 
   function nextQuizRound() {
@@ -214,18 +234,33 @@
       t.classList.remove("ghosted");
       if (ctx.attempts <= 2) ctx.correct++;
       sfx("correct");
-      feedback(true, "Great job!", "太棒了！");
-      setTimeout(function () { tts.sayEn(r.successEn || "Great job!", { rate: 0.8 }); }, 120);
-      setTimeout(nextQuizRound, 1400);
+      feedback(true, "Great job!");
+      tts.sayEn(r.successEn || "Great job!", { rate: 0.78 });
+      /* 不自动跳题：等孩子按 Next */
+      setTimeout(function () {
+        if (!ctx) return;
+        var last = ctx.idx >= ctx.meta.rounds.length - 1;
+        showNext(last ? "Finish 🏁" : "Next ▶");
+      }, 900);
     } else {
       ctx.firstTry = false;
       o.blocked = true;
       t.classList.add("wrong");
       sfx("wrong");
-      feedback(false, "Try again!", "再想一想～");
-      setTimeout(function () { tts.sayEn("Try again!", { rate: 0.8 }); }, 120);
-      setTimeout(function () { t.classList.remove("wrong"); t.classList.add("ghosted"); }, 600);
+      feedback(false, "Try again!");
+      tts.sayEn("Try again!", { rate: 0.8 });
+      setTimeout(function () { t.classList.remove("wrong"); t.classList.add("ghosted"); }, 650);
     }
+  };
+
+  actions.gameNext = function () {
+    if (!ctx || !ctx.locked) return;
+    var b = nextBtn();
+    if (b && b.classList.contains("hidden")) return;
+    sfx("tap");
+    hideNext();
+    if (ctx.type === "quiz") nextQuizRound();
+    else if (ctx.type === "roomfind") nextRoomRound();
   };
 
   function startQuiz(meta) {
@@ -233,13 +268,14 @@
     var shell = el("div", "game-shell");
     shell.innerHTML = gameHead(meta.title, meta.emoji, meta.rounds.length) +
       '<div class="game-stage"><div class="stage-card">' +
-      '<div class="stage-visual"></div><div class="stage-caption"></div><div class="stage-zh"></div>' +
+      '<div class="stage-visual"></div><div class="stage-caption"></div>' +
       '</div></div><div class="game-options"></div>' +
-      '<div class="game-foot"><button class="btn btn-ghost" data-act="gameReplay">🔊 再听一次</button></div>';
+      '<div class="game-foot"><button class="btn btn-ghost" data-act="gameReplay">🔊 Listen again</button>' +
+      '<button class="btn btn-next hidden" data-act="gameNext">Next ▶</button></div>';
     qs("#overlay-root").appendChild(shell);
     ctx = {
       type: "quiz", meta: meta, shell: shell, idx: 0, correct: 0, locked: false,
-      els: { visual: qs(".stage-visual", shell), caption: qs(".stage-caption", shell), zh: qs(".stage-zh", shell), options: qs(".game-options", shell) },
+      els: { visual: qs(".stage-visual", shell), caption: qs(".stage-caption", shell), options: qs(".game-options", shell) },
       overlay: { close: function () { closeGame(true); } }
     };
     U4.overlays.push(ctx.overlay);
@@ -254,18 +290,20 @@
     if (!ctx) return;
     var w = ctx.rounds[ctx.idx];
     if (!w) { finishRoomFind(); return; }
+    var idxAt = ctx.idx;
     ctx.locked = false;
+    hideNext();
     U4.setHTML(ctx.els.caption, "Where is the " + w.en + "?");
-    U4.setHTML(ctx.els.zh, w.zh + "在哪里？点一点它！");
     qsa(".hotspot", ctx.shell).forEach(function (h) { h.classList.remove("found", "wrong"); });
     updateDots(ctx.idx);
     ctx.replay = function () {
-      tts.seq([
-        { text: w.zh + "在哪里？点一点它！", lang: "zh-CN" },
-        { text: "Where is the " + w.en + "?", lang: "en-US" }
-      ]);
+      if (ctx.idx !== idxAt) return;
+      tts.sayEn("Where is the " + w.en + "?", { rate: 0.76 });
+      setTimeout(function () {
+        if (ctx && ctx.idx === idxAt) tts.sayEn("Can you find the " + w.en + "?", { rate: 0.72 });
+      }, 1700);
     };
-    setTimeout(function () { if (ctx && ctx.replay) ctx.replay(); }, 300);
+    setTimeout(function () { if (ctx && ctx.idx === idxAt && ctx.replay) ctx.replay(); }, 420);
   }
   function nextRoomRound() {
     if (!ctx) return;
@@ -295,15 +333,22 @@
       ctx.locked = true;
       t.classList.add("found");
       sfx("correct");
-      fx.praise("Yes!", "找到了！");
+      fx.praise("Yes!", "", "🌟");
       ctx.correct++;
-      setTimeout(function () { tts.sayEn(target.sentence || ("It's a " + target.en + "."), { rate: 0.8 }); }, 100);
-      setTimeout(nextRoomRound, 1800);
+      feedback(true, target.sentence || ("It's a " + target.en + "."));
+      tts.sayEn(target.sentence || ("It's a " + target.en + "."), { rate: 0.76 });
+      /* 不自动跳下一题：等孩子按 Next */
+      setTimeout(function () {
+        if (!ctx) return;
+        var last = ctx.idx >= ctx.rounds.length - 1;
+        showNext(last ? "Finish 🏁" : "Next ▶");
+      }, 1000);
     } else {
       ctx.wrong = (ctx.wrong || 0) + 1;
       t.classList.add("wrong");
       sfx("wrong");
-      setTimeout(function () { t.classList.remove("wrong"); }, 480);
+      feedback(false, "Try again!");
+      setTimeout(function () { t.classList.remove("wrong"); }, 520);
       tts.sayEn("Not here. Try again!", { rate: 0.8 });
     }
   };
@@ -316,7 +361,7 @@
     var rounds = util.shuffle(room.words).slice(0, Math.min(4, room.words.length));
     var shell = el("div", "game-shell");
     var meta = {
-      title: opts.title || ("听音找物 · " + room.zh),
+      title: opts.title || ("Listen & Find · " + room.en),
       emoji: opts.emoji || room.emoji,
       levelId: opts.levelId || null,
       skill: opts.skill || "家具词汇",
@@ -326,14 +371,15 @@
     };
     shell.innerHTML = gameHead(meta.title, meta.emoji, rounds.length) +
       '<div class="game-stage"><div class="stage-card" style="max-width:64rem;padding:.8rem 1rem">' +
-      '<div class="stage-caption"></div><div class="stage-zh"></div>' +
+      '<div class="stage-caption"></div>' +
       '<div class="rf-slot" style="width:100%"></div>' +
-      '</div></div><div class="game-foot"><button class="btn btn-ghost" data-act="gameReplay">🔊 再听一次</button></div>';
+      '</div></div><div class="game-foot"><button class="btn btn-ghost" data-act="gameReplay">🔊 Listen again</button>' +
+      '<button class="btn btn-next hidden" data-act="gameNext">Next ▶</button></div>';
     qs("#overlay-root").appendChild(shell);
     U4.setHTML(qs(".rf-slot", shell), roomStageHtml(room, { hotspotAct: "rfTap" }));
     ctx = {
       type: "roomfind", meta: meta, shell: shell, rounds: rounds, idx: 0, correct: 0, wrong: 0, locked: false,
-      els: { caption: qs(".stage-caption", shell), zh: qs(".stage-zh", shell) },
+      els: { caption: qs(".stage-caption", shell) },
       overlay: { close: function () { closeGame(true); } }
     };
     ctx.meta.onRetry = function () { startRoomFind(roomId, opts); };
@@ -368,7 +414,7 @@
         skill: "词汇复习",
         questionEn: "Where is the " + target.en + "?",
         questionZh: "找到「" + target.zh + "」！",
-        stageHtml: '<span style="font-size:1.6rem;font-weight:900">🔎 找一找</span>',
+        stageHtml: '<span style="font-size:1.6rem;font-weight:900">🔎 Find it!</span>',
         options: options,
         successEn: "Yes! It is the " + target.en + ".",
         successZh: "对！是" + target.zh + "。"
@@ -494,7 +540,7 @@
         skill: "形状",
         questionEn: "Find the " + target + "!",
         questionZh: "找到「" + meta.zh + "」点一点！",
-        stageHtml: '<span style="font-size:1.5rem;font-weight:900">🔷 ' + meta.zh + "</span>",
+        stageHtml: '<span style="font-size:1.5rem;font-weight:900">🔷 Find the shape!</span>',
         options: util.shuffle(options),
         successEn: "Yes! It is a " + target + ".",
         successZh: "对！这是" + meta.zh + "。"
@@ -524,7 +570,7 @@
      ===================================================== */
   function levelMeta(level, rounds) {
     return {
-      levelId: String(level.id), title: "第 " + level.id + " 关 · " + level.title,
+      levelId: String(level.id), title: "Level " + level.id + " · " + (level.sub || level.title),
       emoji: level.emoji, skill: level.skill, rounds: rounds, id: "lv" + level.id,
       onRetry: function () { startLevel(level); },
       onContinue: function () { U4.router.show("journey"); }
@@ -536,7 +582,7 @@
     if (level.type === "story") { U4.Stories.open(level.story, level); return; }
     if (level.type === "room") {
       startRoomFind(level.room, {
-        levelId: String(level.id), title: "第 " + level.id + " 关 · " + level.title,
+        levelId: String(level.id), title: "Level " + level.id + " · " + (level.sub || level.title),
         skill: level.skill, emoji: level.emoji,
         onContinue: function () { U4.router.show("journey"); },
         onClose: function () { U4.router.show("journey"); }
@@ -554,11 +600,15 @@
   }
   U4.startLevel = startLevel;
 
+  var FREE_EN = {
+    howmany: "Numbers & stationery", yesno: "Yes or No?", phonics: "Phonics B / C",
+    shapes: "Shapes", review: "Big review"
+  };
   function startFree(item) {
     var rounds, meta;
     if (item.type === "room") {
       startRoomFind(item.room, {
-        title: "自由练习 · " + DATA.rooms[item.room].zh, skill: "家具词汇",
+        title: "Free play · " + DATA.rooms[item.room].en, skill: "家具词汇",
         freeKey: "free:room:" + item.room,
         onContinue: function () { U4.router.show("map"); },
         onClose: function () { U4.router.show("map"); }
@@ -573,7 +623,7 @@
     var skill = item.type === "howmany" ? "数量与文具" : item.type === "yesno" ? "have / has got" : item.type === "phonics" ? "自然拼读" : item.type === "shapes" ? "形状" : "综合复习";
     startQuiz({
       id: "free-" + item.type, freeKey: "free:" + item.type,
-      title: item.label + " · 自由练习", emoji: item.emoji || "🎮", skill: skill,
+      title: "Free play · " + (FREE_EN[item.type] || "Fun game"), emoji: item.emoji || "🎮", skill: skill,
       rounds: rounds,
       onContinue: function () { U4.router.show("map"); },
       onClose: function () { U4.router.show("map"); }
