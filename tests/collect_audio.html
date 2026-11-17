@@ -1,0 +1,90 @@
+<!doctype html><html><head><meta charset="utf-8"><title>collect</title></head><body>
+<iframe id="app" src="../index.html" style="width:1200px;height:800px"></iframe>
+<pre id="out">running</pre>
+<script src="lib.js"></script>
+<script>
+(async function () {
+  try {
+    const iframe = document.getElementById("app");
+    const W = iframe.contentWindow;
+    await U4TestLib.waitReady(W);
+    const U4 = W.U4, D = W.document;
+    const set = new Set();
+    const add = (s) => { if (typeof s !== "string") return; s = s.replace(/\s+/g, " ").trim(); if (s) set.add(s); };
+    add("Welcome to Happy House!");
+    add("Hi! I'm Matt. Let's learn English together!");
+    // 题库生成器（多次洗牌，覆盖所有变体）
+    const builders = U4.builders;
+    for (let rep = 0; rep < 6; rep++) {
+      for (const key of ["find", "howmany", "yesno", "guessroom", "phonics", "shapes", "review"]) {
+        let rounds;
+        try { rounds = key === "find" ? builders.find(8) : builders[key](); } catch (e) { continue; }
+        rounds.forEach((r) => {
+          add(r.questionEn); add(r.captionEn); add(r.speakEn); add(r.successEn);
+          (r.speakList || []).forEach((x) => add(x.text));
+          (r.options || []).forEach((o) => { });
+        });
+      }
+    }
+    // 词汇 / 句子 / 房间
+    U4.DATA.roomOrder.forEach((rid) => {
+      const room = U4.DATA.rooms[rid];
+      add(room.en); if (room.intro) add(room.intro.en);
+      room.words.forEach((w) => {
+        add(w.en); add(w.sentence);
+        add("Where is the " + w.en + "?");
+        add("Can you find the " + w.en + "?");
+        add("Yes! It is the " + w.en + ".");
+      });
+    });
+    U4.DATA.stationery.forEach((s) => {
+      add(s.en);
+      add("Where is the " + s.en + "?");
+      add("Can you find the " + s.en + "?");
+      add("Yes! It is the " + s.en + ".");
+      add("I have got a " + s.en + ".");
+    });
+    U4.DATA.shapes.forEach((s) => {
+      add(s.type); add("Find the " + s.type + "!"); add("Yes! It is a " + s.type + ".");
+    });
+    U4.DATA.numbers.forEach((n) => add(n.en));
+    U4.DATA.phonics.B.concat(U4.DATA.phonics.C).forEach((p) => {
+      add(p.word); add(p.word.charAt(0).toUpperCase() + " is for " + p.word + "!");
+    });
+    // 数量句型
+    U4.DATA.howManyRounds.forEach((r) => {
+      add("How many " + r.item.plural + " have you got?");
+      add("How many " + r.item.plural + "?");
+      add("I have got " + r.numEn + " " + r.item.plural + ".");
+    });
+    // 是非句型
+    U4.DATA.yesNoRounds.forEach((r) => { add(r.qEn); add(r.fullEn); });
+    // 猜房间句型
+    U4.DATA.guessRoomRounds.forEach((r) => {
+      add(r.qEn);
+      const room = U4.DATA.rooms[r.room];
+      if (room) add("Yes! It is the " + room.en + ".");
+    });
+    // 固定反馈 & 指令
+    ["Great job!", "Try again!", "Yes!", "No!", "Listen!", "Which letter comes first?",
+      "Look!", "Well done!", "You did it! Great job!", "Good try! Let's play again!",
+      "Where is it?", "Find it!", "Find the shape!", "Can you find the lamp?",
+      "This is my home.", "What a nice home!"].forEach(add);
+    // 故事绘本
+    const stories = (U4.Stories && U4.Stories.data) || {};
+    Object.keys(stories).forEach((id) => {
+      const st = stories[id];
+      (st.pages || []).forEach((p) => {
+        add(p.en); add(p.explainEn); add(p.yesText); add(p.noText);
+      });
+      (st.quiz || []).forEach((q) => { add(q.qEn); add(q.fullEn); add(q.successEn); });
+    });
+    document.title = "COLLECTED " + set.size;
+    const out = document.getElementById("out");
+    out.textContent = JSON.stringify([...set]);
+  } catch (e) {
+    document.title = "COLLECT ERROR";
+    document.getElementById("out").textContent = "ERROR " + ((e && e.stack) || e);
+  }
+})();
+</script></body></html>

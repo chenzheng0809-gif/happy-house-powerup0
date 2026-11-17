@@ -295,11 +295,63 @@
     }
     return list[0] || null;
   }
+  /* ---------- 预录英语配音：任何浏览器都能放，不依赖系统语音包 ---------- */
+  var CLIPS = window.U4_AUDIO || {};
+  var CLIPS_ZH = window.U4_AUDIO_ZH || {};
+  var clipCount = Object.keys(CLIPS).length + Object.keys(CLIPS_ZH).length;
+  var clipEl = null, clipGen = 0;
+  function clipKey(text) { return String(text).replace(/\s+/g, " ").trim().toLowerCase(); }
+  function stopClip() {
+    clipGen++;
+    if (clipEl) { try { clipEl.pause(); } catch (e) { } clipEl = null; }
+  }
+  function playClip(text, opts) {
+    var url = CLIPS[clipKey(text)] || CLIPS_ZH[clipKey(text)];
+    if (!url) return false;
+    opts = opts || {};
+    if (synth) { try { synth.cancel(); } catch (e) { } }
+    stopClip();
+    var myGen = clipGen;
+    var el;
+    try { el = new Audio(url); } catch (e) { return false; }
+    el.preload = "auto";
+    el.volume = 1;
+    clipEl = el;
+    var finished = false, counted = false;
+    function countStart() {
+      if (counted) return;
+      counted = true;
+      tts.health.starts++;
+      tts.health.clips++;
+      tts.health.lastStartAt = Date.now();
+    }
+    function finish(ok) {
+      if (finished) return;
+      finished = true;
+      if (myGen !== clipGen) return;
+      tts.speaking = false;
+      if (ok) {
+        countStart();
+        if (opts.onend) { try { opts.onend(); } catch (e) { } }
+      } else if (opts.onfail) { try { opts.onfail(); } catch (e) { } }
+    }
+    el.onended = function () { finish(true); };
+    el.onerror = function () { finish(false); };
+    el.onplaying = countStart;
+    el.onplayingthrough = countStart;
+    tts.speaking = true;
+    var p = null;
+    try { p = el.play(); } catch (e) { finish(false); return false; }
+    if (p && typeof p.catch === "function") p.catch(function () { finish(false); });
+    return true;
+  }
+
   var tts = {
     supported: !!synth,
     speaking: false,
     gen: 0,
-    health: { starts: 0, lastStartAt: 0, lastError: "", errors: [] },
+    clips: clipCount,
+    health: { starts: 0, clips: 0, lastStartAt: 0, lastError: "", errors: [] },
     refresh: function () { loadVoices(); return tts.status(); },
     status: function () {
       loadVoices();
@@ -316,20 +368,34 @@
         supported: !!synth, sound: state.sound !== false, voices: voices.length, en: en, zh: zh,
         enVoice: ev ? ev.name : "", zhVoice: zv ? zv.name : "",
         starts: tts.health.starts, lastStartAt: tts.health.lastStartAt, lastError: tts.health.lastError,
-        errors: tts.health.errors.slice(), paused: paused
+        errors: tts.health.errors.slice(), paused: paused,
+        clips: clipCount, clipStarts: tts.health.clips
       };
     },
     stop: function () {
       tts.gen++;
       tts.speaking = false;
+      if (clipEl) { try { clipEl.pause(); } catch (e) { } clipEl = null; }
       if (synth) { try { synth.cancel(); } catch (e) { } }
     },
     speak: function (text, opts) {
       opts = opts || {};
       if (!text) return false;
-      if (!synth || !tts.supported || state.sound === false) { if (opts.onend) setTimeout(opts.onend, 0); return false; }
-      text = String(text).replace(/\s+/g, " ").trim();
-      if (!text) return false;
+      if (state.sound === false) { if (opts.onend) setTimeout(opts.onend, 0); return false; }
+      var raw = String(text).replace(/\s+/g, " ").trim();
+      if (!raw) return false;
+      // 1) 优先播放预录音频（最稳定：不依赖系统语音包）
+      if (clipCount && playClip(raw, {
+        onend: opts.onend,
+        onfail: function () { tts.speakTTS(raw, opts); }
+      })) return true;
+      // 2) 回退：浏览器语音合成
+      return tts.speakTTS(raw, opts);
+    },
+    speakTTS: function (text, opts) {
+      opts = opts || {};
+      if (!synth || !tts.supported) { if (opts.onend) setTimeout(opts.onend, 0); return false; }
+      if (clipEl) { try { clipEl.pause(); } catch (e) { } clipEl = null; clipGen++; }
       var lang = opts.lang || "en-US";
       var myGen = ++tts.gen;
       var wasActive = false;
@@ -373,7 +439,6 @@
           finish("error", { error: "speak-failed" });
           return;
         }
-        // 看门狗：1.4 秒还没开始就重试一次（Chrome 偶尔会卡在取消后的空转状态）
         setTimeout(function () {
           if (done || myGen !== tts.gen) return;
           if (tts.health.lastStartAt > startedAt) return;
@@ -405,14 +470,13 @@
       }
       next();
     },
-    /* 启动后自检：没声音 / 没语音包时给出可见提示 */
+    /* 启动后自检：没声音时给出可见提示 */
     selfCheck: function () {
       if (state.sound === false) return;
       if (util.qs("#sound-banner")) return;
       var st = tts.status();
-      if (!st.supported) { fx.banner("这个浏览器不支持语音朗读，建议用 Chrome 或 Safari 打开", "openSoundCheck"); return; }
-      if (st.voices === 0) { fx.banner("没有检测到语音包，点这里看看怎么打开声音", "openSoundCheck"); return; }
-      if (st.starts === 0) { fx.banner("好像还没有听到声音？点这里检查音量与语音设置", "openSoundCheck"); }
+      if (!st.supported && !st.clips) { fx.banner("这个浏览器不支持语音，建议用 Chrome 或 Safari 打开", "openSoundCheck"); return; }
+      if (st.starts === 0) { fx.banner("好像没有听到声音？点这里检查音量与声音设置", "openSoundCheck"); }
     }
   };
   U4.tts = tts;

@@ -158,7 +158,14 @@
   /* =====================================================
      关闭游戏
      ===================================================== */
+  /* 清掉上一回合还没执行的语音定时器，避免答对后被旧提示打断 */
+  function clearRoundTimers() {
+    if (!ctx) return;
+    if (ctx.startTimer) { clearTimeout(ctx.startTimer); ctx.startTimer = null; }
+    if (ctx.promptTimer) { clearTimeout(ctx.promptTimer); ctx.promptTimer = null; }
+  }
   function closeGame(silent) {
+    clearRoundTimers();
     if (ctx) {
       tts.stop();
       if (ctx.overlay) U4.overlays.remove(ctx.overlay);
@@ -172,7 +179,7 @@
     closeGame();
     if (onClose) onClose();
   };
-  actions.gameReplay = function () { if (ctx && ctx.replay) ctx.replay(); };
+  actions.gameReplay = function () { clearRoundTimers(); if (ctx && ctx.replay) ctx.replay(); };
 
   /* =====================================================
      类型一：通用问答（数字 / 是非 / 猜房间 / 自然拼读 / 形状 / 复习）
@@ -197,10 +204,11 @@
       if (r.speakList) tts.seq(r.speakList);
       else tts.sayEn(r.speakEn || r.questionEn, { rate: 0.78 });
     };
-    setTimeout(function () { if (ctx && ctx.idx === idxAt && ctx.replay) ctx.replay(); }, 420);
+    ctx.startTimer = setTimeout(function () { if (ctx && ctx.idx === idxAt && ctx.replay) ctx.replay(); }, 420);
   }
 
   function nextQuizRound() {
+    clearRoundTimers();
     if (!ctx) return;
     ctx.idx++;
     if (ctx.idx >= ctx.meta.rounds.length) finishQuiz();
@@ -221,6 +229,7 @@
   }
 
   actions.gameOpt = function (t) {
+    clearRoundTimers();
     if (!ctx || ctx.type !== "quiz" || ctx.locked) return;
     var r = ctx.meta.rounds[ctx.idx];
     var i = parseInt(t.getAttribute("data-i"), 10);
@@ -299,14 +308,15 @@
     ctx.replay = function () {
       if (ctx.idx !== idxAt) return;
       tts.sayEn("Where is the " + w.en + "?", { rate: 0.76 });
-      setTimeout(function () {
+      ctx.promptTimer = setTimeout(function () {
         if (ctx && ctx.idx === idxAt) tts.sayEn("Can you find the " + w.en + "?", { rate: 0.72 });
       }, 1700);
     };
-    setTimeout(function () { if (ctx && ctx.idx === idxAt && ctx.replay) ctx.replay(); }, 420);
+    ctx.startTimer = setTimeout(function () { if (ctx && ctx.idx === idxAt && ctx.replay) ctx.replay(); }, 420);
   }
   function nextRoomRound() {
     if (!ctx) return;
+    clearRoundTimers();
     ctx.idx++;
     if (ctx.idx >= ctx.rounds.length) finishRoomFind();
     else playRoomRound();
@@ -326,6 +336,7 @@
   }
   actions.rfTap = function (t) {
     if (!ctx || ctx.type !== "roomfind" || ctx.locked) return;
+    clearRoundTimers();
     var id = t.getAttribute("data-word");
     var target = ctx.rounds[ctx.idx];
     if (!target) return;

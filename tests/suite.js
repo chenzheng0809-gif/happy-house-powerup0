@@ -30,6 +30,7 @@ window.U4TestSuite = {
     ok("tts status api", typeof U4.tts.status === "function" && !!U4.tts.status());
     var tst = U4.tts.status();
     ok("tts api reports voices", typeof tst.voices === "number", "voices=" + tst.voices + " supported=" + tst.supported);
+    ok("pre-recorded english clips loaded", U4.tts.status().clips > 100, "clips=" + U4.tts.status().clips);
 
     // 2) room explore
     qa(".room-tile")[0].click();

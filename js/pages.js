@@ -237,6 +237,7 @@
       var diag = '<div class="diag-line"><span>浏览器语音合成</span><b class="' + (vs.supported ? "diag-ok" : "diag-bad") + '">' + (vs.supported ? "✅ 支持" : "❌ 不支持") + "</b></div>" +
         '<div class="diag-line"><span>可用声音</span><b class="' + (vs.voices ? "diag-ok" : "diag-bad") + '">' + vs.voices + " 个（英语 " + vs.en + " · 中文 " + vs.zh + "）</b></div>" +
         '<div class="diag-line"><span>首选声音</span><b>' + (vs.enVoice || "—") + " / " + (vs.zhVoice || "—") + "</b></div>" +
+        '<div class="diag-line"><span>预录英语配音</span><b class="' + (vs.clips ? "diag-ok" : "diag-bad") + '">' + (vs.clips ? vs.clips + " 条（不依赖系统语音包，推荐）" : "未加载") + "</b></div>" +
         '<div class="diag-line"><span>最近朗读</span><b class="' + (vs.starts ? "diag-ok" : "diag-bad") + '">' + (vs.starts ? "已成功开始 " + vs.starts + " 次" : (vs.lastError ? "出错：" + vs.lastError : "还没有开始过")) + "</b></div>" +
         '<div class="row-btns"><button class="btn btn-listen" data-act="testVoiceEn">🔊 测英语</button>' +
         '<button class="btn btn-ghost" data-act="testVoiceZh">🔊 测中文</button>' +
