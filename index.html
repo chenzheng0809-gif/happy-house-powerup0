@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FFF7EC">
+<title>快乐小屋 Happy House · PowerUp 0 Unit 4 互动课堂</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+</head>
+<body>
+
+<!-- ====== 开屏：点击进入（同时解锁音频） ====== -->
+<div id="splash" class="splash">
+  <div class="splash-sky">
+    <div class="cloud c1">☁️</div>
+    <div class="cloud c2">☁️</div>
+    <div class="cloud c3">☁️</div>
+    <div class="float-e f1">🛏️</div>
+    <div class="float-e f2">💡</div>
+    <div class="float-e f3">🕰️</div>
+    <div class="float-e f4">🪞</div>
+    <div class="float-e f5">💻</div>
+    <div class="float-e f6">🐦</div>
+    <div class="float-e f7">✨</div>
+    <div class="float-e f8">🧸</div>
+  </div>
+  <div class="splash-house" aria-hidden="true">
+    <div class="sh-roof"></div>
+    <div class="sh-body">
+      <span class="sh-window">🪟</span>
+      <span class="sh-door">🚪</span>
+      <span class="sh-chimney">🏠</span>
+    </div>
+  </div>
+  <h1 class="splash-title">快乐小屋</h1>
+  <p class="splash-sub">Happy House&nbsp;·&nbsp;PowerUp 0&nbsp;Unit 4 <b>At home</b></p>
+  <p class="splash-desc">中班 · 大班 英语启蒙互动课堂</p>
+  <button id="btn-splash-start" class="btn btn-mega" type="button">
+    <span class="mega-emoji">👆</span> 点一点，开始探险！
+  </button>
+  <p class="splash-tip">建议打开声音 🔊 &nbsp;|&nbsp; 可全屏使用（⌃⌘F）</p>
+  <div class="splash-note">第一次点击会播放欢迎语音</div>
+</div>
+
+<!-- ====== 主应用 ====== -->
+<div id="app" class="app hidden">
+  <div class="app-bg" aria-hidden="true">
+    <div class="bg-sun">☀️</div>
+    <div class="bg-cloud bc1">☁️</div>
+    <div class="bg-cloud bc2">☁️</div>
+    <div class="bg-cloud bc3">☁️</div>
+    <div class="bg-hill h1"></div>
+    <div class="bg-hill h2"></div>
+  </div>
+
+  <header class="topbar">
+    <button id="btn-brand" class="brand" type="button" title="回到小屋">
+      <span class="brand-emoji">🏠</span>
+      <span class="brand-text">快乐小屋<small>Happy House</small></span>
+    </button>
+    <div class="topbar-right">
+      <button id="star-pill" class="star-pill" type="button" title="我的星星">
+        <span class="sp-star">⭐</span><span id="star-count">0</span>
+      </button>
+      <button id="btn-sound" class="icon-btn" type="button" title="声音开关">🔊</button>
+      <button id="btn-teacher" class="icon-btn" type="button" title="老师 / 家长">👩‍🏫</button>
+    </div>
+  </header>
+
+  <main id="screens" class="screens">
+    <section id="screen-map" class="screen"></section>
+    <section id="screen-journey" class="screen"></section>
+    <section id="screen-room" class="screen"></section>
+    <section id="screen-decor" class="screen"></section>
+    <section id="screen-teacher" class="screen"></section>
+  </main>
+
+  <nav class="tabbar" id="tabbar">
+    <button class="tab" data-tab="map" type="button"><span class="tab-e">🏡</span><span class="tab-t">小屋</span></button>
+    <button class="tab" data-tab="journey" type="button"><span class="tab-e">🗺️</span><span class="tab-t">闯关</span></button>
+    <button class="tab" data-tab="decor" type="button"><span class="tab-e">🎨</span><span class="tab-t">装扮</span></button>
+    <button class="tab" data-tab="teacher" type="button"><span class="tab-e">👩‍🏫</span><span class="tab-t">老师</span></button>
+  </nav>
+</div>
+
+<!-- 游戏 / 故事 / 弹窗挂载点 -->
+<div id="overlay-root"></div>
+<div id="modal-root"></div>
+<canvas id="fx-canvas" class="fx-canvas"></canvas>
+<div id="toast-root" class="toast-root"></div>
+
+<!-- 运行时报错可见提示（便于老师反馈问题） -->
+<div id="boot-error" class="boot-error hidden"></div>
+
+<script src="js/data.js"></script>
+<script src="js/core.js"></script>
+<script src="js/games.js"></script>
+<script src="js/stories.js"></script>
+<script src="js/pages.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
